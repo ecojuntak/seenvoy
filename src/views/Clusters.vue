@@ -87,7 +87,7 @@ export default defineComponent({
           dataIndex: 'endpoints_count',
         },
         {
-          title: 'Opeartion',
+          title: 'Operation',
           key: 'action',
         },
       ],

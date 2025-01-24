@@ -23,7 +23,7 @@ const columns = [
     key: 'direction',
   },
   {
-    title: 'Opeartion',
+    title: 'Operation',
     key: 'action',
   },
 ]

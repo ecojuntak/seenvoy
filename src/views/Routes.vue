@@ -66,7 +66,7 @@ export default defineComponent({
           key: 'name',
         },
         {
-          title: 'Opeartion',
+          title: 'Operation',
           key: 'action',
         },
       ],
