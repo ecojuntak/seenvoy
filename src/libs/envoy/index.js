@@ -2,126 +2,145 @@ import axios from "./axios";
 import { count, db, query } from "./db";
 
 export const fetch_config_dump = async (include_eds) => {
-    let url = "/config_dump";
-    if (include_eds) {
-        url += "?include_eds";
-    }
-
-    return (await axios.get(url)).data.configs.map(config => { config.key = config["@type"]; return config })
+    const url = include_eds ? "/config_dump?include_eds" : "/config_dump";
+    const response = await axios.get(url);
+    return response.data.configs.map(config => ({ ...config, key: config["@type"] }));
 }
 
 export const sync_config_dump = async (include_eds) => {
     const configs = await fetch_config_dump(include_eds);
     console.log(configs);
-    const cfg = new Configs(configs)
+    const cfg = new Configs(configs);
 
     try {
-        await db.bootstrap.clear()
-        await db.listeners.clear()
-        await db.routes.clear()
-        await db.clusters.clear()
-        await db.endpoints.clear()
-        await db.bootstrap.add(cfg.getBootstrapConfig());
-        await db.listeners.bulkAdd(cfg.getListenerConfigs())
-        await db.routes.bulkAdd(cfg.getRouteConfigs())
-        await db.clusters.bulkAdd(cfg.getClusterConfigs())
-        await db.endpoints.bulkAdd(cfg.getEndpointConfigs())
+        await Promise.all([
+            db.bootstrap.clear(),
+            db.listeners.clear(), 
+            db.routes.clear(),
+            db.clusters.clear(),
+            db.endpoints.clear()
+        ]);
+
+        await Promise.all([
+            db.bootstrap.add(cfg.getBootstrapConfig()),
+            db.listeners.bulkAdd(cfg.getListenerConfigs()),
+            db.routes.bulkAdd(cfg.getRouteConfigs()),
+            db.clusters.bulkAdd(cfg.getClusterConfigs()),
+            db.endpoints.bulkAdd(cfg.getEndpointConfigs())
+        ]);
     } catch (error) {
-        console.log(error);
+        console.error('Error syncing config dump:', error);
     }
 }
 
-export const statistic = async () => {
-    return {
-        listeners: await count('listeners'),
-        routes: await count('routes'),
-        clusters: await count('clusters'),
-        endpoints: await count('endpoints'),
-    }
-}
+export const statistic = async () => ({
+    listeners: await count('listeners'),
+    routes: await count('routes'),
+    clusters: await count('clusters'),
+    endpoints: await count('endpoints'),
+});
 
-export const bootstrapConfig = async () => {
-    return await db.bootstrap.toCollection().last()
-}
 
-export const listenerConfigs = async (param) => { return query('listeners', param) }
+export const bootstrapConfig = () => db.bootstrap.toCollection().last();
+export const listenerConfigs = (param) => query('listeners', param);
+export const routeConfigs = (param) => query('routes', param);
+export const clusterConfigs = (param) => query('clusters', param);
+export const endpointConfigs = (param) => query('endpoints', param);
 
-export const routeConfigs = async (param) => { return query('routes', param) }
-
-export const clusterConfigs = async (param) => { return query('clusters', param) }
-
-export const endpointConfigs = async (param) => { return query('endpoints', param) }
-
-export const inject = (key, value) => { return (el) => { el[key] = value; return el } }
+export const inject = (key, value) => (el) => ({ ...el, [key]: value });
 
 export class Configs {
-    configs;
     constructor(configs) {
-        this.configs = configs
+        this.configs = configs;
     }
+
+    findConfig(type) {
+        return this.configs.find(d => d["@type"].endsWith(type));
+    }
+
     getBootstrapConfig() {
-        return this.configs.find(d => d["@type"].endsWith("BootstrapConfigDump")).bootstrap
+        return this.findConfig("BootstrapConfigDump").bootstrap;
     }
+
     getListenerConfigs() {
-        const lcd = this.configs.find(d => d["@type"].endsWith("ListenersConfigDump"))
+        const lcd = this.findConfig("ListenersConfigDump");
         const configs = [];
-        if(lcd.hasOwnProperty('static_listeners')){
-            lcd.static_listeners.forEach(ln => { ln.listener._static = true; configs.push(ln.listener) })
+
+        if (lcd?.static_listeners) {
+            configs.push(...lcd.static_listeners.map(ln => ({ ...ln.listener, _static: true })));
         }
-        if(lcd.hasOwnProperty('dynamic_listeners')){
-            lcd.dynamic_listeners.forEach(item => { configs.push(item.active_state.listener) })
+
+        if (lcd?.dynamic_listeners) {
+            configs.push(...lcd.dynamic_listeners.map(item => item.active_state.listener));
         }
-        return configs.map(el => {
-            el.traffic_direction = el.traffic_direction || 'UNSPECIFIED'
-            return el;
-        })
+
+        return configs.map(el => ({
+            ...el,
+            traffic_direction: el.traffic_direction || 'UNSPECIFIED'
+        }));
     }
+
     getRouteConfigs() {
-        const rcd = this.configs.find(d => d["@type"].endsWith("v3.RoutesConfigDump"))
+        const rcd = this.findConfig("v3.RoutesConfigDump");
         const configs = [];
-        if(rcd.hasOwnProperty('static_route_configs')){
-            rcd.static_route_configs.forEach(item => { item.route_config._static = true; configs.push(item.route_config) })
+
+        if (rcd?.static_route_configs) {
+            configs.push(...rcd.static_route_configs.map(item => ({ ...item.route_config, _static: true })));
         }
-        if(rcd.hasOwnProperty('dynamic_route_configs')){
-            rcd.dynamic_route_configs.forEach(item => { configs.push(item.route_config) })
+
+        if (rcd?.dynamic_route_configs) {
+            configs.push(...rcd.dynamic_route_configs.map(item => item.route_config));
         }
-        return configs
+
+        return configs;
     }
+
     getClusterConfigs() {
-        const ccd = this.configs.find(d => d["@type"].endsWith("v3.ClustersConfigDump"))
+        const ccd = this.findConfig("v3.ClustersConfigDump");
         const configs = [];
-        if(ccd.hasOwnProperty('static_clusters')){
-            ccd.static_clusters.forEach(item => { item.cluster._static = true; configs.push(item.cluster) })
+
+        if (ccd?.static_clusters) {
+            configs.push(...ccd.static_clusters.map(item => ({ ...item.cluster, _static: true })));
         }
-        if(ccd.hasOwnProperty('dynamic_active_clusters')){
-            ccd.dynamic_active_clusters.forEach(item => { configs.push(item.cluster) })
+
+        if (ccd?.dynamic_active_clusters) {
+            configs.push(...ccd.dynamic_active_clusters.map(item => item.cluster));
         }
-        return configs
+
+        return configs;
     }
+
     getEndpointConfigs() {
-        const ecd = this.configs.find(d => d["@type"].endsWith("v3.EndpointsConfigDump"))
+        const ecd = this.findConfig("v3.EndpointsConfigDump");
         const configs = [];
-        if(ecd.hasOwnProperty('static_endpoint_configs')){
-            ecd.static_endpoint_configs.forEach(item => { item.endpoint_config._static = true; configs.push(item.endpoint_config) })
+
+        if (ecd?.static_endpoint_configs) {
+            configs.push(...ecd.static_endpoint_configs.map(item => ({ ...item.endpoint_config, _static: true })));
         }
-        if(ecd.hasOwnProperty('dynamic_endpoint_configs')){
-            ecd.dynamic_endpoint_configs.forEach(item => { configs.push(item.endpoint_config) })
+
+        if (ecd?.dynamic_endpoint_configs) {
+            configs.push(...ecd.dynamic_endpoint_configs.map(item => item.endpoint_config));
         }
-        return configs
+
+        return configs;
     }
 }
 
 export const listeners = async () => {
-    return (await axios.get('/listeners?format=json')).data.listener_statuses;
+    const response = await axios.get('/listeners?format=json');
+    return response.data.listener_statuses;
 }
 
 export const clusterStatuses = async () => {
-    return (await axios.get('/clusters?format=json')).data.cluster_statuses;
+    const response = await axios.get('/clusters?format=json');
+    return response.data.cluster_statuses;
 }
 
 export const buildEndpointName = (endpoint) => {
-    const addr = endpoint.address;
-    return addr.socket_address ? `${addr.socket_address.address}:${addr.socket_address.port_value}` : addr.pipe.path
+    const { address } = endpoint;
+    return address.socket_address 
+        ? `${address.socket_address.address}:${address.socket_address.port_value}`
+        : address.pipe.path;
 }
 
 export * from "./relation";
