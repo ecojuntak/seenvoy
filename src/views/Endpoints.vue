@@ -8,9 +8,9 @@ export default defineComponent({
   setup() {
     const dataSource = ref([])
     onMounted(() => {
-      endpointConfigs().then(data => {
+      endpointConfigs({ page_no: 1, page_size: 5000 }).then(data => {
         console.log(data);
-        dataSource.value = data.map((el, idx) => { el.key = idx; return el })
+        dataSource.value = data.items.map((el, idx) => { el.key = idx; return el })
       });
     });
 
@@ -38,7 +38,7 @@ export default defineComponent({
           key: 'name',
         },
         {
-          title: 'Opeartion',
+          title: 'Operation',
           key: 'action',
         },
       ],

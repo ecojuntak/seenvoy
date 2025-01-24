@@ -11,7 +11,7 @@ const routes = [
   { path: '/listeners', name: 'Listeners', component: Listeners },
   { path: '/routes', name: 'Routes', component: Routes },
   { path: '/clusters', name: 'Clusters', component: Clusters },
-  // { path: '/endpoints', name: 'Endpoints', component: Endpoints },
+  { path: '/endpoints', name: 'Endpoints', component: Endpoints },
 ]
 
 const router = createRouter({
