@@ -1,8 +1,8 @@
 module github.com/saltbo/seenvoy
 
-go 1.17
+go 1.23
 
-require github.com/urfave/cli/v2 v2.11.0
+require github.com/urfave/cli/v2 v2.27.1
 
 require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
