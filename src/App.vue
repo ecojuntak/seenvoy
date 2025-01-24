@@ -22,7 +22,6 @@ export default defineComponent({
 
         const lastSync = ref(localStorage.getItem("lastSync"));
         const onSync = (e) => {
-            console.log(e);
             loading.value = true;
             sync_config_dump(true).then(() => {
                 message.success('ConfigDump Sync Done.')
@@ -31,6 +30,11 @@ export default defineComponent({
                 loading.value = false;
                 spinning.value = false
                 location.reload();
+            }).catch(error => {
+                message.info('Failed to sync ConfigDump');
+                loading.value = false;
+                spinning.value = false;
+                console.error(error);
             });
         };
 
@@ -70,7 +74,7 @@ export default defineComponent({
                     <a-menu-item key="Listeners">Listeners</a-menu-item>
                     <a-menu-item key="Routes">Routes</a-menu-item>
                     <a-menu-item key="Clusters">Clusters</a-menu-item>
-                    <!-- <a-menu-item key="Endpoints">Endpoints</a-menu-item> -->
+                    <a-menu-item key="Endpoints">Endpoints</a-menu-item>
                 </a-menu>
             </div>
             <div class="syncbar">
